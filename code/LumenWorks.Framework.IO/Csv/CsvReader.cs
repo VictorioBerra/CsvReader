@@ -253,6 +253,17 @@ namespace LumenWorks.Framework.IO.Csv
         /// Initializes a new instance of the CsvReader class.
         /// </summary>
         /// <param name="reader">A <see cref="T:TextReader"/> pointing to the CSV file.</param>
+        /// <param name="hasHeaders"><see langword="true"/>If field names are located on the first non commented line, otherwise, <see langword="false"/>.</param>
+        /// <exception cref="T:ArgumentNullException"><paramref name="reader"/> is a <see langword="null"/>.</exception>
+        /// <exception cref="T:ArgumentException">Cannot read from <paramref name="reader"/>.</exception>
+        public CsvReader(TextReader reader, bool hasHeaders, Func<CsvReader, bool> filter) : this(reader, hasHeaders, DefaultDelimiter, DefaultQuote, filter: filter)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the CsvReader class.
+        /// </summary>
+        /// <param name="reader">A <see cref="T:TextReader"/> pointing to the CSV file.</param>
         /// <param name="hasHeaders"><see langword="true"/> if field names are located on the first non commented line, otherwise, <see langword="false"/>.</param>
         /// <param name="bufferSize">The buffer size in bytes.</param>
         /// <exception cref="T:ArgumentNullException"><paramref name="reader"/> is a <see langword="null"/>.</exception>
@@ -303,7 +314,17 @@ namespace LumenWorks.Framework.IO.Csv
         /// <param name="nullValue">The value which denotes a DbNull-value.</param>
         /// <exception cref="T:ArgumentNullException"><paramref name="reader"/> is a <see langword="null"/>.</exception>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="bufferSize"/> must be 1 or more.</exception>
-        public CsvReader(TextReader reader, bool hasHeaders = true, char delimiter = DefaultDelimiter, char quote = DefaultQuote, char escape = DefaultEscape, char comment = DefaultComment, ValueTrimmingOptions trimmingOptions = ValueTrimmingOptions.UnquotedOnly, int bufferSize = DefaultBufferSize, string nullValue = null)
+        public CsvReader(
+            TextReader reader,
+            bool hasHeaders = true,
+            char delimiter = DefaultDelimiter,
+            char quote = DefaultQuote,
+            char escape = DefaultEscape,
+            char comment = DefaultComment,
+            ValueTrimmingOptions trimmingOptions = ValueTrimmingOptions.UnquotedOnly,
+            int bufferSize = DefaultBufferSize,
+            string nullValue = null,
+            Func<CsvReader, bool> filter = null)
         {
 #if DEBUG
 #if !NETSTANDARD1_3
@@ -349,6 +370,8 @@ namespace LumenWorks.Framework.IO.Csv
             NullValue = nullValue;
             SupportsMultiline = true;
             SkipEmptyLines = true;
+
+            Filter = filter;
 
             Columns = new List<Column>();
             DefaultHeaderName = "Column";
@@ -454,6 +477,12 @@ namespace LumenWorks.Framework.IO.Csv
         /// </summary>
         /// <value>A value indicating if the reader will skip empty lines.</value>
         public bool SkipEmptyLines { get; set; }
+
+        /// <summary>
+        /// Gets of sets a delegate used to stop a row from being read.
+        /// </summary>
+        /// <value>A value indicating if the reader will skip empty lines.</value>
+        Func<CsvReader, bool> Filter { get; set; }
 
         /// <summary>
         /// Gets or sets the default header name when it is an empty string or only whitespaces.
@@ -1614,6 +1643,16 @@ namespace LumenWorks.Framework.IO.Csv
                 {
                     Array.Clear(_fields, 0, _fields.Length);
                     _nextFieldIndex = 0;
+                }
+
+                if(Filter != null)
+                {
+                    var shouldKeepRecord = Filter.Invoke(this);
+                    if (!shouldKeepRecord)
+                    {
+                        // Causes a row to be skipped?
+                        SkipToNewLine(ref _nextFieldStart);
+                    }
                 }
 
                 MissingFieldFlag = false;
