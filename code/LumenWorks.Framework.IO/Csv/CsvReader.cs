@@ -1645,19 +1645,19 @@ namespace LumenWorks.Framework.IO.Csv
                     _nextFieldIndex = 0;
                 }
 
-                if(Filter != null)
+                MissingFieldFlag = false;
+                ParseErrorFlag = false;
+                FileRecordIndex++;
+
+                if (Filter != null)
                 {
                     var shouldKeepRecord = Filter.Invoke(this);
                     if (!shouldKeepRecord)
                     {
-                        // Causes a row to be skipped?
-                        SkipToNewLine(ref _nextFieldStart);
+                        return ReadNextRecord(false, true);
                     }
                 }
 
-                MissingFieldFlag = false;
-                ParseErrorFlag = false;
-                FileRecordIndex++;
             }
 
             return true;
